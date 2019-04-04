@@ -240,6 +240,48 @@ int libBND::addToRepackQueue(int id, std::string replace_file)
     repackQueue newRepack;
     newRepack.fileOffset = v_file_entries[id].file_offset;
 
+    cout << "make struct" << endl;
+    struct tmpstruct
+    {
+        uint32_t offset;
+        int id;
+    };
+
+    cout << "convert db" << endl;
+    vector<tmpstruct> tmp;
+    for(int i=0; i<v_file_entries.size(); i++)
+    {
+        tmpstruct a;
+        a.offset = v_file_entries[i].file_offset;
+        a.id = i;
+        tmp.push_back(a);
+    }
+
+    cout << "sort" << endl;
+    std::sort(tmp.begin(), tmp.end(), [](auto const &a, auto const &b) { return a.offset < b.offset; });
+
+    ///replace with some finding method
+    for(int i=0; i<tmp.size(); i++)
+    {
+        if(tmp[i].id == id)
+        {
+            if(i != tmp.size()-1)
+            {
+                newRepack.fileOldSize = tmp[i+1].offset - tmp[i].offset;
+                cout << "Full size detected 1: " << newRepack.fileOldSize << endl;
+            }
+            else
+            {
+                newRepack.fileOldSize = main_filesize - tmp[i].offset;
+                cout << "Full size detected 2: " << newRepack.fileOldSize << endl;
+            }
+
+            break;
+        }
+    }
+
+    ///calculate the file size based on the one entry higher to include the zeroes into the file!!!!
+    /*
     if(id != v_file_entries.size()-1)
     {
         newRepack.fileOldSize = v_file_entries[id+1].file_offset - v_file_entries[id];
@@ -247,16 +289,16 @@ int libBND::addToRepackQueue(int id, std::string replace_file)
     else
     {
 
-    }
+    }*/
 
     newRepack.filePath = replace_file;
     newRepack.id = id;
 
-    cout << "Added to repack queue: ";
+    cout << "Added to repack queue: " << hex;
     cout << newRepack.fileOffset << " ";
     cout << newRepack.fileOldSize << " ";
     cout << newRepack.filePath << " ";
-    cout << newRepack.id << endl;
+    cout << dec << newRepack.id << endl;
 
     v_repacks.push_back(newRepack);
 }
@@ -265,7 +307,7 @@ int libBND::repack(std::string file)
 {
     cout << "Repacking..." << endl;
 
-    system("copy DATA_CMN.BND TEST.BND");
+    system("copy DATA_CMN.BND REPACK_TMP.BND");
 
     while(v_repacks.size() > 0)
     {
@@ -277,12 +319,21 @@ int libBND::repack(std::string file)
         int new_filesize = sz.tellg();
         sz.close();
 
-        std::ifstream sz2("TEST.BND", ios::ate | ios::binary);
+        std::ifstream sz2("REPACK_TMP.BND", ios::ate | ios::binary);
         int main_filesize = sz2.tellg();
         sz2.close();
 
-        int diff = new_filesize - v_repacks[0].fileOldSize;
         int add_zero = 0;
+
+        while((new_filesize+add_zero)%32 > 0)
+        {
+            add_zero++;
+        }
+
+        cout << add_zero << " zeroes added!" << endl;
+
+        int diff = new_filesize - v_repacks[0].fileOldSize + add_zero;
+        /**int add_zero = 0;
 
         while(abs(diff)%32 > 0)
         {
@@ -294,7 +345,7 @@ int libBND::repack(std::string file)
             add_zero++;
 
             cout << "Adding diff zero for alignment" << endl;
-        }
+        }*/
 
         shiftQueue newShift;
         newShift.sizeBiggerThan = v_repacks[0].fileOffset;
@@ -311,20 +362,20 @@ int libBND::repack(std::string file)
 
         cout << "bytes: " << std::hex << bytes_left << " offset: " << offset << endl;
 
-        ofstream outf("tmp.bnd",ios::binary | ios::trunc);
+        ofstream outf("PACKED_TMP.BND",ios::binary | ios::trunc);
         outf.close();
 
         cout << "1st part" << endl;
 
         while(bytes_left > chunk_size)
         {
-            ifstream bnd("TEST.BND", ios::binary);
+            ifstream bnd("REPACK_TMP.BND", ios::binary);
             char data[chunk_size];
             bnd.seekg(offset);
             bnd.read(data,chunk_size);
             bnd.close();
 
-            ofstream out("tmp.bnd",ios::binary | ios::app);
+            ofstream out("PACKED_TMP.BND",ios::binary | ios::app);
             out.write(data,chunk_size);
             out.close();
 
@@ -335,13 +386,13 @@ int libBND::repack(std::string file)
 
         cout << "2st part" << endl;
 
-        ifstream bnd("TEST.BND", ios::binary);
+        ifstream bnd("REPACK_TMP.BND", ios::binary);
         char data[bytes_left];
         bnd.seekg(offset);
         bnd.read(data,bytes_left);
         bnd.close();
 
-        ofstream out("tmp.bnd", ios::binary | ios::app);
+        ofstream out("PACKED_TMP.BND", ios::binary | ios::app);
         out.write(data,bytes_left);
         out.close();
 
@@ -357,7 +408,7 @@ int libBND::repack(std::string file)
 
         repack_file.close();
 
-        ofstream out2("tmp.bnd", ios::binary | ios::app);
+        ofstream out2("PACKED_TMP.BND", ios::binary | ios::app);
         out2.write(new_file_char.c_str(),new_filesize);
 
         for(int z=0; z<add_zero; z++)
@@ -375,13 +426,13 @@ int libBND::repack(std::string file)
 
         while(bytes_left > chunk_size)
         {
-            ifstream bnd("TEST.BND", ios::binary);
+            ifstream bnd("REPACK_TMP.BND", ios::binary);
             char data[chunk_size];
             bnd.seekg(offset);
             bnd.read(data,chunk_size);
             bnd.close();
 
-            ofstream out("tmp.bnd",ios::binary | ios::app);
+            ofstream out("PACKED_TMP.BND",ios::binary | ios::app);
             out.write(data,chunk_size);
             out.close();
 
@@ -393,12 +444,12 @@ int libBND::repack(std::string file)
         cout << "5th part" << endl;
 
         char data2[bytes_left];
-        ifstream bnd2("TEST.BND", ios::binary);
+        ifstream bnd2("REPACK_TMP.BND", ios::binary);
         bnd2.seekg(offset);
         bnd2.read(data2,bytes_left);
         bnd2.close();
 
-        ofstream out3("tmp.bnd", ios::binary | ios::app);
+        ofstream out3("PACKED_TMP.BND", ios::binary | ios::app);
         out3.write(data2,bytes_left);
         out3.close();
         cout << "bytes: " << std::hex << bytes_left << " offset: " << offset << endl;
@@ -409,10 +460,11 @@ int libBND::repack(std::string file)
 
         for(int v=0; v<v_repacks.size(); v++)
         {
-            v_repacks[v].fileOffset += diff;
+            cout << "Supposed to increase the offset by " << hex << diff << dec << endl;
+            //v_repacks[v].fileOffset += diff;
         }
 
-        system("copy tmp.bnd TEST.BND");
+        system("copy PACKED_TMP.BND REPACK_TMP.BND");
 
         cout << "Finished repacking file" << endl;
     }
@@ -422,7 +474,7 @@ int libBND::save(std::string file)
 {
     repack("DATA_CMN.BND");
 
-    std::ifstream sz("TEST.BND", ios::ate | ios::binary);
+    std::ifstream sz("REPACK_TMP.BND", ios::ate | ios::binary);
     int og_filesize = sz.tellg();
     sz.close();
 
@@ -594,15 +646,15 @@ int libBND::save(std::string file)
 
     cout << "packing up the dictionary" << endl;
 
-    int bytes_left = og_filesize - file_off;
-    int offset = file_off;
+    int bytes_left = og_filesize - old_file_off;
+    int offset = old_file_off;
     int chunk_size = 1024*1024;
 
     cout << "bytes: " << std::hex << bytes_left << " offset: " << offset << endl;
 
     while(bytes_left > chunk_size)
     {
-        ifstream og("TEST.BND", ios::binary);
+        ifstream og("REPACK_TMP.BND", ios::binary);
         char data[chunk_size];
         og.seekg(offset);
         og.read(data,chunk_size);
@@ -618,7 +670,7 @@ int libBND::save(std::string file)
         cout << "bytes: " << std::hex << bytes_left << " offset: " << offset << endl;
     }
 
-    ifstream og("TEST.BND", ios::binary);
+    ifstream og("REPACK_TMP.BND", ios::binary);
     char data[bytes_left];
     og.seekg(offset);
     og.read(data,bytes_left);
@@ -801,7 +853,14 @@ int libBND::addFile(int folder_id, std::string file)
     string onlyName = file.substr(file.find_last_of("\\/")+1);
 
     FileEntry new_file;
-    new_file.folder_level = v_file_entries[folder_id].folder_level * (-1) - 1;
+    if(v_file_entries[folder_id].folder_level > 0)
+    {
+        new_file.folder_level = v_file_entries[folder_id].folder_level * (-1) - 1;
+    }
+    else
+    {
+        new_file.folder_level = v_file_entries[folder_id].folder_level;
+    }
     new_file.file_offset = fsize;
     new_file.file_size = new_filesize;
     new_file.filename = onlyName;
