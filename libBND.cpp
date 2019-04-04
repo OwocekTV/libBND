@@ -707,74 +707,26 @@ int libBND::save(std::string file)
 
 int libBND::rename(int id, std::string new_name)
 {
-    ifstream bnd("DATA_CMN.BND", ios::binary);
-
-    ///Reload the file but with changed name so all changes apply properly along with CRC calculations
-    v_file_entries.clear();
-
-    bool name_read = true;
-    int name_off = info_off;
+    ///replace ALL of THIS!
+    ///There is absolutely no need to read the main file, all the operations can be done on the v_file_entries vector.
+    ///Accessing the main file prevents from multi-renaming, as we don't want to touch the main file at all.
 
     vector<string> current_folder;
+    v_file_entries[id].filename = new_name;
 
-    while(name_read)
+    for(int i=0; i<v_file_entries.size(); i++)
     {
-        debugOutput(0,string(" Reading new file name entry at ")+to_string(name_off));
-
-        FileEntry tmp_entry;
-
-        bnd.seekg(name_off);
-        bnd.read(reinterpret_cast<char*>(&tmp_entry.folder_level), sizeof(int8_t));
-
-        debugOutput(0,string("Folder level: ")+to_string(tmp_entry.folder_level));
-
-        bnd.seekg(name_off+0x1);
-        bnd.read(reinterpret_cast<char*>(&tmp_entry.prev_size), sizeof(int8_t));
-
-        debugOutput(0,string("Previous entry size: ")+to_string(tmp_entry.prev_size));
-
-        bnd.seekg(name_off+0x2);
-        bnd.read(reinterpret_cast<char*>(&tmp_entry.cur_size), sizeof(uint8_t));
-
-        debugOutput(0,string("Current entry size: ")+to_string(tmp_entry.cur_size));
-
-        bnd.seekg(name_off+0x3);
-        bnd.read(reinterpret_cast<char*>(&tmp_entry.crc_offset), sizeof(uint32_t));
-
-        debugOutput(0,string("Offset to CRC dictionary: ")+to_string(tmp_entry.crc_offset));
-
-        char tmp = 0xFF;
-        int i = 0;
-
-        while(tmp != 0x0)
-        {
-            bnd.seekg(name_off+7+i);
-            tmp = bnd.get();
-
-            if(tmp != 0x0)
-            tmp_entry.filename += tmp;
-
-            i++;
-        }
-
-        if(v_file_entries.size() == id)
-        {
-            tmp_entry.filename = new_name;
-        }
-
-        debugOutput(0,string("File name: ")+tmp_entry.filename);
-
         ///Handling directory names
-        if(tmp_entry.folder_level > 0) ///>0 for directories, <0 for files
+        if(v_file_entries[i].folder_level > 0) ///>0 for directories, <0 for files
         {
-            while(tmp_entry.folder_level <= current_folder.size())
+            while(v_file_entries[i].folder_level <= current_folder.size())
             {
                 current_folder.pop_back();
             }
 
-            if(tmp_entry.folder_level >= current_folder.size())
+            if(v_file_entries[i].folder_level >= current_folder.size())
             {
-                current_folder.push_back(tmp_entry.filename);
+                current_folder.push_back(v_file_entries[i].filename);
             }
         }
 
@@ -785,60 +737,22 @@ int libBND::rename(int id, std::string new_name)
             full_dir += current_folder[i];
         }
 
-
         debugOutput(0,string("Current directory: ")+full_dir);
 
         string full_file_name = "";
 
-        if(tmp_entry.folder_level < 0)
+        if(v_file_entries[i].folder_level < 0)
         {
-            tmp_entry.full_filename = full_dir + tmp_entry.filename;
+            v_file_entries[i].full_filename = full_dir + v_file_entries[i].filename;
         }
 
-        if(tmp_entry.folder_level > 0)
+        if(v_file_entries[i].folder_level > 0)
         {
-            tmp_entry.full_filename = full_dir;
+            v_file_entries[i].full_filename = full_dir;
         }
 
-        debugOutput(0,string("Full file name: ")+tmp_entry.full_filename);
-
-        if(tmp_entry.cur_size == 0xFF)
-        {
-            name_read = false;
-        }
-
-        name_off += tmp_entry.cur_size;
-
-
-        bnd.seekg(tmp_entry.crc_offset);
-        bnd.read(reinterpret_cast<char*>(&tmp_entry.CRC), sizeof(uint32_t));
-
-        debugOutput(0,string("File CRC: ")+to_string(tmp_entry.CRC));
-
-        bnd.seekg(tmp_entry.crc_offset+4);
-        bnd.read(reinterpret_cast<char*>(&tmp_entry.info_offset), sizeof(uint32_t));
-
-        debugOutput(0,string("File info offset: ")+to_string(tmp_entry.info_offset));
-
-        bnd.seekg(tmp_entry.crc_offset+8);
-        bnd.read(reinterpret_cast<char*>(&tmp_entry.file_offset), sizeof(uint32_t));
-
-        debugOutput(0,string("File data offset: ")+to_string(tmp_entry.file_offset));
-
-        bnd.seekg(tmp_entry.crc_offset+12);
-        bnd.read(reinterpret_cast<char*>(&tmp_entry.file_size), sizeof(uint32_t));
-
-        debugOutput(0,string("File data size: ")+to_string(tmp_entry.file_size));
-
-        v_file_entries.push_back(tmp_entry);
+        debugOutput(0,string("Full file name: ")+v_file_entries[i].full_filename);
     }
-
-    zero_bytes = (entry_count - v_file_entries.size()) * 16;
-    debugOutput(0,string("Detected zero bytes: ")+to_string(zero_bytes));
-
-    debugListAllFiles();
-
-    bnd.close();
 }
 
 int libBND::addFile(int folder_id, std::string file)
