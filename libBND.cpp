@@ -865,6 +865,22 @@ int libBND::addFile(int folder_id, std::string file)
     new_file.file_size = new_filesize;
     new_file.filename = onlyName;
 
+    int f_level_target = new_file.folder_level * (-1) - 1;
+    vector<string> folders;
+    string folder;
+
+    for(int i=folder_id; i>=0; i--)
+    {
+        if(v_file_entries[i].folder_level == f_level_target)
+        {
+            folder = v_file_entries[i].full_filename;
+            break;
+        }
+    }
+
+    new_file.full_filename = folder + onlyName;
+    cout << "Full filename: " << new_file.full_filename << endl;
+
     int zeroes = 0;
 
     while((new_filesize+zeroes) % 32 > 0)
