@@ -481,13 +481,13 @@ int libBND::save(std::string file)
 
     for(int i=0; i<v_removeFiles.size(); i++)
     {
-        cout << "Removing file with id " << v_removeFiles[i] << endl;
+        cout << "Removing file with id " << v_removeFiles[i] << "(" << v_file_entries[v_removeFiles[i]].filename << ")" << endl;
 
         for(int a=0; a<v_removeFiles.size(); a++)
         {
             ///remove file with id 5
             ///files with id 6, 7, etc... shift -1
-            cout << "Checking " << v_removeFiles[a] << " > " << v_removeFiles[i] << endl;
+            //cout << "Checking " << v_removeFiles[a] << " > " << v_removeFiles[i] << endl;
 
             if(v_removeFiles[a] > v_removeFiles[i])
             v_removeFiles[a]--;
@@ -575,7 +575,7 @@ int libBND::save(std::string file)
     uint32_t zero = 0x0;
     int dictionary_size = 0x28 + zero_bytes + (v_file_entries.size() * 16) + filename_size;
 
-    while((dictionary_size % 64) > 0)
+    while((dictionary_size % 2048) > 0)
     {
         dictionary_size++;
     }
@@ -652,7 +652,7 @@ int libBND::save(std::string file)
         bnd.put(0x0);
     }
 
-    while((bnd.tellp() % 64) > 0)
+    while((bnd.tellp() % 2048) > 0)
     bnd.put(0x0);
 
     bnd.close();
@@ -719,14 +719,9 @@ int libBND::save(std::string file)
     return 1;
 }
 
-int libBND::rename(int id, std::string new_name)
+int libBND::reloadNames()
 {
-    ///replace ALL of THIS!
-    ///There is absolutely no need to read the main file, all the operations can be done on the v_file_entries vector.
-    ///Accessing the main file prevents from multi-renaming, as we don't want to touch the main file at all.
-
     vector<string> current_folder;
-    v_file_entries[id].filename = new_name;
 
     for(int i=0; i<v_file_entries.size(); i++)
     {
@@ -767,6 +762,12 @@ int libBND::rename(int id, std::string new_name)
 
         debugOutput(0,string("Full file name: ")+v_file_entries[i].full_filename);
     }
+}
+
+int libBND::rename(int id, std::string new_name)
+{
+    v_file_entries[id].filename = new_name;
+    reloadNames();
 }
 
 int libBND::addFile(int folder_id, std::string file)
@@ -811,7 +812,7 @@ int libBND::addFile(int folder_id, std::string file)
 
     int zeroes = 0;
 
-    while((new_filesize+zeroes) % 32 > 0)
+    while((new_filesize+zeroes) % 2048 > 0)
     {
         zeroes++;
         cout << "Adding a zero for alignment" << endl;
@@ -838,12 +839,82 @@ int libBND::removeFile(int id)
     v_removeFiles.push_back(id);
 }
 
-int libBND::addFolder(int id, std::string file)
+int libBND::addFolder(int id, std::string name)
 {
+    cout << "Adding " << name << " to the archive" << endl;
 
+    FileEntry new_file;
+    if(v_file_entries[id].folder_level > 0)
+    {
+        new_file.folder_level = v_file_entries[id].folder_level + 1;
+    }
+    else
+    {
+        new_file.folder_level = v_file_entries[id].folder_level * (-1);
+    }
+    new_file.file_offset = 0;
+    new_file.file_size = 0;
+    new_file.filename = name;
+
+    int f_level_target = new_file.folder_level - 1;
+    vector<string> folders;
+    string folder;
+
+    for(int i=id; i>=0; i--)
+    {
+        if(v_file_entries[i].folder_level == f_level_target)
+        {
+            folder = v_file_entries[i].full_filename;
+            break;
+        }
+    }
+
+    new_file.full_filename = folder + name;
+    cout << "Full filename: " << new_file.full_filename << endl;
+
+    v_file_entries.insert(v_file_entries.begin() + id + 1, new_file);
+
+    reloadNames();
 }
 
-int libBND::removeFolder(int id, int mode)
+int libBND::removeFolder(int id)
 {
+    cout << "Removing folder with ID " << id << "(" << v_file_entries[id].filename << ")" << endl;
 
+    int dest = v_file_entries[id].folder_level;
+    cout << "dest: " << dest << endl;
+
+    v_removeFiles.push_back(id);
+
+    for(int i=id+1; i<v_file_entries.size(); i++)
+    {
+        int f = v_file_entries[i].folder_level;
+        int of = f;
+
+        if(f < 0)
+        f = f*(-1);
+
+        cout << "f: " << f << " of: " << of << endl;
+
+        if(f == dest+1)
+        {
+            if(of < 0) ///file
+            {
+                removeFile(i);
+            }
+
+            if(of > 0)
+            {
+                removeFolder(i);
+            }
+        }
+        else
+        {
+            if(f <= dest)
+            {
+                cout << "Destination found!" << endl;
+                break;
+            }
+        }
+    }
 }

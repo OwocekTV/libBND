@@ -93,10 +93,11 @@ class libBND
     int addToRepackQueue(int id, std::string replace_file);
     int repack();
     int save(std::string file);
+    int reloadNames();
     int addFile(int id, std::string file);
     int removeFile(int id);
     int addFolder(int id, std::string file);
-    int removeFolder(int id, int mode);
+    int removeFolder(int id);
     int rename(int id, std::string new_name);
 
     std::vector<std::string> listNames();
