@@ -8,6 +8,7 @@
 class libBND
 {
     public:
+    std::string og_filename;
     uint32_t head,version,val3,val4,info_off,file_off,file_count,entry_count,zero_bytes;
     int fsize;
 
@@ -29,7 +30,7 @@ class libBND
     struct shiftQueue
     {
         uint32_t sizeBiggerThan;
-        uint32_t amountToShift;
+        int amountToShift;
     };
 
     struct repackQueue
@@ -60,6 +61,12 @@ class libBND
         int zeroes;
     };
 
+    struct removeQueue
+    {
+        int fileOffset;
+
+    };
+
     ///Dictionary
     std::vector<FileEntry> v_file_entries;
 
@@ -72,6 +79,9 @@ class libBND
     ///New files
     std::vector<addQueue> v_addFiles;
 
+    ///Remove files
+    std::vector<int> v_removeFiles;
+
     bool debug = false;
 
     libBND();
@@ -81,7 +91,7 @@ class libBND
 
     int load(std::string file);
     int addToRepackQueue(int id, std::string replace_file);
-    int repack(std::string file);
+    int repack();
     int save(std::string file);
     int addFile(int id, std::string file);
     int removeFile(int id);
