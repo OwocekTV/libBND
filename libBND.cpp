@@ -62,6 +62,8 @@ void libBND::debugListAllFiles()
 
 int libBND::load(std::string file)
 {
+    og_dictionary = file;
+    dictionary_name = og_dictionary;
     og_filename = file;
 
     std::ifstream sz(file, ios::ate | ios::binary);
@@ -243,6 +245,20 @@ int libBND::load(std::string file)
     bnd.close();
 
     return 1;
+}
+
+int libBND::setDataSource(string file)
+{
+    og_filename = file;
+    external = true;
+}
+
+int libBND::setDictionaryName(string file)
+{
+    string p = og_dictionary.substr(0,og_dictionary.find_first_of("\\/")+1);
+    string n = p+file;
+
+    dictionary_name = n;
 }
 
 int libBND::addToRepackQueue(int id, std::string replace_file)
@@ -659,11 +675,25 @@ int libBND::save(std::string file)
 
     ///now put the rest of the file
 
+    if(external)
+    {
+        copyFile("tmp.bnd",dictionary_name);
+
+        ofstream t("tmp.bnd", ios::trunc);
+        t.close();
+    }
+
     cout << "packing up the dictionary" << endl;
 
     int bytes_left = og_filesize - old_file_off;
     int offset = old_file_off;
     int chunk_size = 1024*1024;
+
+    if(external)
+    {
+        bytes_left += old_file_off;
+        offset -= old_file_off;
+    }
 
     //cout << "bytes: " << std::hex << bytes_left << " offset: " << offset << endl;
 

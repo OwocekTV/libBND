@@ -8,7 +8,13 @@
 class libBND
 {
     public:
+    std::string og_dictionary;
     std::string og_filename;
+    std::string dictionary_name;
+
+    bool encrypted = false;
+    bool external = false;
+
     uint32_t head,version,val3,val4,info_off,file_off,file_count,entry_count,zero_bytes;
     int fsize;
 
@@ -90,6 +96,9 @@ class libBND
     void debugListAllFiles();
 
     int load(std::string file);
+    ///for external (DATAMS)
+    int setDataSource(std::string file);
+    int setDictionaryName(std::string file);
     int addToRepackQueue(int id, std::string replace_file);
     int repack();
     int save(std::string file);
