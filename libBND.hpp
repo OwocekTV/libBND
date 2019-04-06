@@ -108,6 +108,8 @@ class libBND
     int addFolder(int id, std::string file);
     int removeFolder(int id);
     int rename(int id, std::string new_name);
+    int extract(int id);
+    int extractAll();
 
     std::vector<std::string> listNames();
     uint32_t getOffset(int ID);

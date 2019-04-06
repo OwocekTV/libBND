@@ -1,6 +1,8 @@
 #include "libBND.hpp"
 #include "CRC.h"
 #include <algorithm>
+#include <direct.h>
+#include <sys/stat.h>
 
 using namespace std;
 
@@ -946,5 +948,101 @@ int libBND::removeFolder(int id)
                 break;
             }
         }
+    }
+}
+
+int libBND::extract(int id)
+{
+    string name = v_file_entries[id].full_filename;
+    string path = og_filename;
+
+    cout << "Extracting " << name << endl;
+
+    string fname = path.substr(path.find_last_of("\\/")+1);
+    fname = fname.substr(0,fname.find_last_of("."));
+    fname = "@"+fname;
+    path = path.substr(0,path.find_last_of("\\/")+1);
+
+    string fpath = path+fname;
+    string outname = fpath+"/"+name;
+
+    //cout << name << " " << path << " " << fname << " " << fpath << endl;
+
+    _mkdir(fpath.c_str());
+
+    if(v_file_entries[id].folder_level > 0)
+    {
+        string ffpath = path+fname+"/"+name;
+
+        ///a really dirty solution
+        //_mkdir(ffpath.c_str());
+        string c = "md \""+ffpath+"\" 2> nul";
+
+        system(c.c_str());
+
+        //cout << ffpath << endl;
+    }
+    else if(v_file_entries[id].folder_level < 0)
+    {
+        string ffname = name.substr(0,name.find_last_of("/")+1);
+        string ffpath = path+fname+"/"+ffname;
+
+        ///a really dirty solution
+        //_mkdir(ffpath.c_str());
+        string c = "md \""+ffpath+"\" 2> nul";
+
+        system(c.c_str());
+
+        //cout << ffpath << endl;
+    }
+
+    ofstream out(outname, ios::trunc);
+    out.close();
+
+    int bytes_left = v_file_entries[id].file_size;
+
+    ///DATAMS handling
+    if(bytes_left >= 536870912)
+    bytes_left -= 536870912;
+
+    int offset = v_file_entries[id].file_offset;
+    int chunk_size = 1024*1024;
+
+    //cout << "bytes_left: " << bytes_left << " offset: " << offset << " chunk_size: " << chunk_size << endl;
+
+    while(bytes_left > chunk_size)
+    {
+        ifstream bnd(og_filename, ios::binary);
+        char data[chunk_size];
+
+        bnd.seekg(offset);
+        bnd.read(data,chunk_size);
+        bnd.close();
+
+        ofstream out(outname, ios::binary | ios::app);
+        out.write(data,chunk_size);
+        out.close();
+
+        bytes_left -= chunk_size;
+        offset += chunk_size;
+    }
+
+    ifstream bnd(og_filename, ios::binary);
+    char data[bytes_left];
+
+    bnd.seekg(offset);
+    bnd.read(data,bytes_left);
+    bnd.close();
+
+    ofstream out2(outname, ios::binary | ios::app);
+    out2.write(data,bytes_left);
+    out2.close();
+}
+
+int libBND::extractAll()
+{
+    for(int i=0; i<v_file_entries.size(); i++)
+    {
+        extract(i);
     }
 }
